@@ -4,6 +4,9 @@ import numpy as np
 import caffe
 import random
 import cv2
+import GPUtil
+
+DEBUG = False
 
 # load model
 model_def = 'deploy.prototxt'
@@ -20,18 +23,22 @@ transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 transformer.set_mean('data', np.array([95, 99, 96]))            # subtract the dataset-mean value in each channel
 
 # load image
-image = caffe.io.load_image('test.png')
+image = caffe.io.load_image('input.jpg')
+
+# resize input image
+
+
 crop_image = image[:, 312:, :]
-resize_image = caffe.io.resize_image(crop_image, [480, 640])
+resize_image = caffe.io.resize_image(image, [480, 640])
 
 #print(resize_image.shape)
-transformed_image = transformer.preprocess('data', crop_image)
+transformed_image = transformer.preprocess('data', resize_image)
 
 # lane predict
 net.blobs['data'].data[...] = transformed_image
 output = net.forward()
 mask_color = np.zeros((480, 640, 3), np.uint8)
-confidence_thread = 0.95
+confidence_thread = 0.7
 
 def random_rgb(num):
    colors = []
@@ -43,10 +50,11 @@ def random_rgb(num):
    return colors
 
 lane_colors = random_rgb(13)
-print(lane_colors)
-print(output['softmax'][0])
+if DEBUG:
+    print(lane_colors)
+    print(output['softmax'][0])
+    print("lane output shape: ", output['softmax'].shape)
 
-print("lane output shape: ", output['softmax'].shape)
 for id, lane in enumerate(output['softmax'][0]):
     index = (lane >= confidence_thread)
     # for row in range(lane.shape[0]):
@@ -55,8 +63,10 @@ for id, lane in enumerate(output['softmax'][0]):
     #             mask_color[row][col] = lane_colors[id]
     mask_color[lane >= confidence_thread] = lane_colors[id]
 
+print(len(output['softmax'][0]))
+GPUtil.showUtilization()
+
 # use cv2 to show the image
 cv2.imshow('mask', mask_color)
 cv2.waitKey(0)
 cv2.destroyAllWindows()
-
