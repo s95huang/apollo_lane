@@ -1,8 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
+
 import numpy as np
 import caffe
-import matplotlib.pyplot as plt
 import random
+import cv2
 
 # load model
 model_def = 'deploy.prototxt'
@@ -14,7 +15,7 @@ net = caffe.Net(model_def,      # defines the structure of the model
 # define transformer
 transformer = caffe.io.Transformer({'data': net.blobs['data'].data.shape})
 transformer.set_transpose('data', (2,0,1))  # move image channels to outermost dimension
-#transformer.set_raw_scale('data', 255)      # rescale from [0, 1] to [0, 255]
+transformer.set_raw_scale('data', 255) # rescale from [0, 1] to [0, 255]
 transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 transformer.set_mean('data', np.array([95, 99, 96]))            # subtract the dataset-mean value in each channel
 
@@ -25,16 +26,12 @@ resize_image = caffe.io.resize_image(crop_image, [480, 640])
 
 #print(resize_image.shape)
 transformed_image = transformer.preprocess('data', crop_image)
-print(transformed_image.shape)
-
-plt.imshow(transformed_image.transpose(1, 2, 0))
-#plt.imshow(crop_image)
 
 # lane predict
 net.blobs['data'].data[...] = transformed_image
 output = net.forward()
 mask_color = np.zeros((480, 640, 3), np.uint8)
-confidence_thread = 0.5
+confidence_thread = 0.95
 
 def random_rgb(num):
    colors = []
@@ -47,6 +44,8 @@ def random_rgb(num):
 
 lane_colors = random_rgb(13)
 print(lane_colors)
+print(output['softmax'][0])
+
 print("lane output shape: ", output['softmax'].shape)
 for id, lane in enumerate(output['softmax'][0]):
     index = (lane >= confidence_thread)
@@ -55,10 +54,9 @@ for id, lane in enumerate(output['softmax'][0]):
     #         if lane[row][col] > confidence_thread:
     #             mask_color[row][col] = lane_colors[id]
     mask_color[lane >= confidence_thread] = lane_colors[id]
-plt.imshow(mask_color)
-plt.show()
 
-# save plot
-plt.imsave('test_result.png', mask_color)
-
+# use cv2 to show the image
+cv2.imshow('mask', mask_color)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
 
