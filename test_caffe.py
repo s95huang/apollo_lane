@@ -1,5 +1,6 @@
 #!/usr/bin/env python2
 
+from unittest import skip
 import numpy as np
 import caffe
 import random
@@ -56,17 +57,18 @@ if DEBUG:
     print("lane output shape: ", output['softmax'].shape)
 
 for id, lane in enumerate(output['softmax'][0]):
+
     index = (lane >= confidence_thread)
     # for row in range(lane.shape[0]):
     #     for col in range(lane.shape[1]):
     #         if lane[row][col] > confidence_thread:
     #             mask_color[row][col] = lane_colors[id]
     mask_color[lane >= confidence_thread] = lane_colors[id]
+    print(lane[0].shape)
 
-print(len(output['softmax'][0]))
 GPUtil.showUtilization()
 
 # use cv2 to show the image
-cv2.imshow('mask', mask_color)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+# cv2.imshow('mask', mask_color)
+# cv2.waitKey(0)
+# cv2.destroyAllWindows()
