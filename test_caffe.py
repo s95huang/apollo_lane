@@ -1,6 +1,5 @@
 #!/usr/bin/env python2
 
-from unittest import skip
 import numpy as np
 import caffe
 import random
@@ -9,7 +8,10 @@ import GPUtil
 
 DEBUG = False
 
+alpha = 0.75
 # load model
+
+# caffe.set_mode_gpu()
 model_def = 'deploy.prototxt'
 model_weights = 'deploy.caffemodel'
 net = caffe.Net(model_def,      # defines the structure of the model
@@ -24,14 +26,15 @@ transformer.set_channel_swap('data', (2,1,0))  # swap channels from RGB to BGR
 transformer.set_mean('data', np.array([95, 99, 96]))            # subtract the dataset-mean value in each channel
 
 # load image
-image = caffe.io.load_image('input.jpg')
+# image = caffe.io.load_image('test.jpg')
+image = caffe.io.load_image('almon1.png')
 
 # resize input image
 
 
 crop_image = image[:, 312:, :]
 resize_image = caffe.io.resize_image(image, [480, 640])
-
+cv_resize_image = cv2.resize(image, (640, 480))
 #print(resize_image.shape)
 transformed_image = transformer.preprocess('data', resize_image)
 
@@ -39,15 +42,26 @@ transformed_image = transformer.preprocess('data', resize_image)
 net.blobs['data'].data[...] = transformed_image
 output = net.forward()
 mask_color = np.zeros((480, 640, 3), np.uint8)
-confidence_thread = 0.7
+# make mask_color all white
+# mask_color[:, :, :] = (255, 255, 255)
+confidence_thread = 0.95
+
 
 def random_rgb(num):
    colors = []
    for i in range(num):
-        r = random.randint(0, 255)
-        g = random.randint(0, 255)
-        b = random.randint(0, 255)
-        colors.append((r, g, b))
+       if i == 0:
+            colors.append((0, 0, 0))
+          #   colors.append((255, 255, 255))
+
+       elif i in range(1, 5) or i == 11:
+            colors.append((255, 0, 0))
+       elif i in range(6, 10) or i == 12:
+            colors.append((0, 255, 0))
+       elif i == 5:
+            colors.append((0, 0, 255))
+       elif i == 10:
+            colors.append((255, 255, 0))
    return colors
 
 lane_colors = random_rgb(13)
@@ -64,11 +78,15 @@ for id, lane in enumerate(output['softmax'][0]):
     #         if lane[row][col] > confidence_thread:
     #             mask_color[row][col] = lane_colors[id]
     mask_color[lane >= confidence_thread] = lane_colors[id]
-    print(lane[0].shape)
+#     print(lane[0].shape)
+
+# dst = cv2.addWeighted(resize_image, alpha, mask_color, 1-alpha, 0.0)
+dst = cv2.addWeighted(cv_resize_image, alpha, mask_color, 1.0-alpha, 0.0, dtype = cv2.CV_32F)
+
 
 GPUtil.showUtilization()
 
 # use cv2 to show the image
-# cv2.imshow('mask', mask_color)
-# cv2.waitKey(0)
-# cv2.destroyAllWindows()
+cv2.imshow('dst', dst)
+cv2.waitKey(0)
+cv2.destroyAllWindows()
